@@ -1,7 +1,6 @@
 import * as functions from 'firebase-functions';
 
-import { updateBooking } from './bookings';
-import { stripe, webhookSecret } from './config';
+import { db, stripe, usersCollection, webhookSecret } from './config';
 
 import Stripe = require('stripe');
 
@@ -21,15 +20,31 @@ export const webhook = functions.https.onRequest(async (req, res) => {
   const intent = event.data.object as Stripe.paymentIntents.IPaymentIntent;
 
   switch (event.type) {
-    case 'payment_intent.succeeded':
-      // Update database
-      // Send email
-      // Notify shipping department
-      if (intent.metadata.bookingId) {
-        await updateBooking(intent.metadata.bookingId, { paymentStatus: 'paid' });
+    case 'customer.subscription.deleted':
+      // Update user subscription status in db
+      const subscription = event.data.object as Stripe.subscriptions.ISubscription;
+
+      const docData = {
+        stateSub: 'inactive',
+      };
+
+      try {
+        const usersSnapshot = await db
+          .collection(usersCollection)
+          .where('stripeCustomerId', '==', subscription.customer)
+          .get();
+        let uid;
+        usersSnapshot.forEach((user) => (uid = user.id));
+        await db.doc(`${usersCollection}/${uid}`).set(docData, { merge: true });
+
+        res.status(200).send(`Subscription canceled and user updated: ${uid}`);
+      } catch (error) {
+        res.status(500).send({ 'Error while updating user:': error });
       }
 
-      console.log('Succeeded:', intent.id);
+      break;
+
+    case 'payment_intent.succeeded':
       res.status(200).send({ 'Succeeded:': intent.id });
       break;
 
