@@ -8,30 +8,40 @@ import { getCustomerId } from './users';
 /**
  * Creates a charge for a specific amount
  */
-export const createIntent = async (uid: string, bookingId: string, amount: number, idempotency_key?: string) => {
+const createIntent = async (uid: string, amount: number, idempotency_key?: string) => {
   const customer = await getCustomerId(uid);
 
   const paymentIntent = await stripe.paymentIntents.create({
     amount,
     currency: 'MXN',
     payment_method_types: ['card'],
+    setup_future_usage: 'off_session',
     metadata: { uid, customer },
   });
 
-  return paymentIntent;
+  return {
+    id: paymentIntent.id,
+    status: paymentIntent.status,
+    next_action: paymentIntent.next_action,
+    client_secret: paymentIntent.client_secret,
+  };
 };
 
 /**
- * Setups and intent to be payed later
+ * Setups an intent to be payed later
  */
-export const setupIntent = async (uid: string, idempotency_key?: string) => {
+const setupIntent = async (uid: string, idempotency_key?: string) => {
   const customer = await getCustomerId(uid);
   const setupInt = await stripe.setupIntents.create({
     customer: customer,
   });
-  console.log('intent :', setupInt);
-  // { client_secret: intent.client_secret }
-  return setupInt;
+
+  return {
+    id: setupInt.id,
+    status: setupInt.status,
+    client_secret: setupInt.client_secret,
+    next_action: setupInt.next_action,
+  };
 };
 
 export const chargePayment = async (uid: string, amount: number, metadata?: any, idempotency_key?: string) => {
@@ -59,7 +69,7 @@ export const chargePayment = async (uid: string, amount: number, metadata?: any,
   }
 };
 
-export const cancelPayment = async (intentId: string) => {
+const cancelPayment = async (intentId: string) => {
   await stripe.paymentIntents.cancel(intentId);
   return 'Payment succesfully canceled';
 };
@@ -74,11 +84,32 @@ export const refundPayment = async (intentId: string, amount: number) => {
 
 export const stripeCreateIntent = functions.https.onCall(async (data, context) => {
   const uid = assertUID(context);
-  const source = assert(data, 'source');
   const amount = assert(data, 'amount');
 
   // Optional
   const idempotency_key = data.itempotency_key;
 
-  return catchErrors(createIntent(uid, source, amount, idempotency_key));
+  return catchErrors(createIntent(uid, amount, idempotency_key));
+});
+
+export const stripeSetupIntent = functions.https.onCall(async (data, context) => {
+  const uid = assertUID(context);
+
+  // Optional
+  const idempotency_key = data.itempotency_key;
+
+  return catchErrors(setupIntent(uid, idempotency_key));
+});
+
+export const stripeCancelIntent = functions.https.onCall(async (data, context) => {
+  const intentId = assert(data, 'intentId');
+
+  return catchErrors(cancelPayment(intentId));
+});
+
+export const stripeRefundIntent = functions.https.onCall(async (data, context) => {
+  const intentId = assert(data, 'intentId');
+  const amount = assert(data, 'amount');
+
+  return catchErrors(refundPayment(intentId, amount));
 });
