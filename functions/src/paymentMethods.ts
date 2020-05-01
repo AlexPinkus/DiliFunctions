@@ -4,13 +4,23 @@ import { stripe } from './config';
 import { assert, assertUID } from './helpers';
 import { getCustomerId } from './users';
 
-export const setDefaultPaymentMethod = async (uid: string, paymentMethodId: string) => {
+const setDefaultPaymentMethod = async (uid: string, paymentMethodId: string) => {
   const customerId = await getCustomerId(uid);
 
   return await stripe.customers.update(customerId, { invoice_settings: { default_payment_method: paymentMethodId } });
 };
 
-export const getPaymentMethods = async (uid: string) => {
+const savePaymentMethod = async (uid: string, paymentMethodId: string) => {
+  const customer = await getCustomerId(uid);
+
+  return await stripe.paymentMethods.attach(paymentMethodId, { customer });
+};
+
+const deletePaymentMethod = async (paymentMethodId: string) => {
+  return await stripe.paymentMethods.detach(paymentMethodId);
+};
+
+const getPaymentMethods = async (uid: string) => {
   const customer = await getCustomerId(uid);
   const paymentMethods = await stripe.paymentMethods.list({
     customer,
@@ -51,4 +61,17 @@ export const stripeGetPaymentMethods = functions.https.onCall(async (data, conte
   const uid = assertUID(context);
 
   return getPaymentMethods(uid);
+});
+
+export const stripeSavePaymentMethod = functions.https.onCall(async (data, context) => {
+  const uid = assertUID(context);
+  const paymentMethodId = assert(data, 'paymentMethodId');
+
+  return savePaymentMethod(uid, paymentMethodId);
+});
+
+export const stripeDeletePaymentMethod = functions.https.onCall(async (data, context) => {
+  const paymentMethodId = assert(data, 'paymentMethodId');
+
+  return deletePaymentMethod(paymentMethodId);
 });
