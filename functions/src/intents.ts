@@ -30,7 +30,7 @@ const createIntent = async (uid: string, amount: number, idempotency_key?: strin
 /**
  * Setups an intent to be payed later
  */
-const setupIntent = async (uid: string, idempotency_key?: string) => {
+const setupIntent = async (uid: string) => {
   const customer = await getCustomerId(uid);
   const setupInt = await stripe.setupIntents.create({
     customer: customer,
@@ -87,7 +87,7 @@ export const stripeCreateIntent = functions.https.onCall(async (data, context) =
   const amount = assert(data, 'amount');
 
   // Optional
-  const idempotency_key = data.itempotency_key;
+  const idempotency_key = data.idempotency_key;
 
   return catchErrors(createIntent(uid, amount, idempotency_key));
 });
@@ -95,10 +95,7 @@ export const stripeCreateIntent = functions.https.onCall(async (data, context) =
 export const stripeSetupIntent = functions.https.onCall(async (data, context) => {
   const uid = assertUID(context);
 
-  // Optional
-  const idempotency_key = data.itempotency_key;
-
-  return catchErrors(setupIntent(uid, idempotency_key));
+  return catchErrors(setupIntent(uid));
 });
 
 export const stripeCancelIntent = functions.https.onCall(async (data, context) => {
