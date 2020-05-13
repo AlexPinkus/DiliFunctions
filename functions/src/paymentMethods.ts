@@ -11,9 +11,16 @@ const setDefaultPaymentMethod = async (uid: string, paymentMethodId: string) => 
 };
 
 const savePaymentMethod = async (uid: string, paymentMethodId: string) => {
-  const customer = await getCustomerId(uid);
+  const customerId = await getCustomerId(uid);
+  const customer = await stripe.customers.retrieve(customerId);
+  const paymentMethod = await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
 
-  return await stripe.paymentMethods.attach(paymentMethodId, { customer });
+  if (customer.invoice_settings && customer.invoice_settings.default_payment_method) {
+    return paymentMethod;
+  }
+
+  await stripe.customers.update(customerId, { invoice_settings: { default_payment_method: paymentMethodId } });
+  return paymentMethod;
 };
 
 const deletePaymentMethod = async (paymentMethodId: string) => {
