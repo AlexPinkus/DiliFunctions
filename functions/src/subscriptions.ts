@@ -4,8 +4,6 @@ import { db, stripe, usersCollection } from './config';
 import { assert, assertUID, catchErrors } from './helpers';
 import { getCustomerId } from './users';
 
-import Stripe = require('stripe');
-
 /**
  * Gets a user's subscriptions
  */
