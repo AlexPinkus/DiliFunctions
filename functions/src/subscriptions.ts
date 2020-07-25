@@ -1,8 +1,10 @@
 import * as functions from 'firebase-functions';
 
-import { db, stripe, usersCollection } from './config';
+import { stripe } from './config';
 import { assert, assertUID, catchErrors } from './helpers';
-import { getCustomerId } from './users';
+import { getCustomerId, getUser, updateUser } from './users';
+
+import Stripe = require('stripe');
 
 /**
  * Gets a user's subscriptions
@@ -15,17 +17,19 @@ const getSubscriptions = async (uid: string, limit?: number) => {
 /**
  * Creates and charges user for a new subscription
  */
-const createSubscription = async (uid: string, plan: string, coupon?: string) => {
-  const customer = await getCustomerId(uid);
+const createSubscription = async (uid: string, plan: string, metadata?: Stripe.IOptionsMetadata, coupon?: string) => {
+  const { stripeCustomerId, trial } = await getUser(uid);
 
   const subscription = await stripe.subscriptions.create({
-    customer,
+    customer: stripeCustomerId,
     coupon,
     items: [
       {
-        plan,
+        price: plan,
       },
-    ],
+    ] as any,
+    trial_from_plan: typeof trial === 'boolean' ? trial : true,
+    metadata,
   });
 
   // Add the plan to existing subscriptions
@@ -33,9 +37,10 @@ const createSubscription = async (uid: string, plan: string, coupon?: string) =>
     planId: plan,
     subId: subscription.id,
     stateSub: 'active',
+    trial: false,
   };
 
-  await db.doc(`${usersCollection}/${uid}`).set(subscriptionValues, { merge: true });
+  await updateUser(uid, subscriptionValues);
 
   return subscription;
 };
@@ -54,7 +59,7 @@ const cancelSubscription = async (uid: string, subscriptionId: string) => {
     stateSub: 'inactive',
   };
 
-  await db.doc(`${usersCollection}/${uid}`).set(docData, { merge: true });
+  await updateUser(uid, docData);
 
   return subscription;
 };
@@ -63,7 +68,7 @@ export const stripeCreateSubscription = functions.https.onCall(async (data, cont
   const uid = assertUID(context);
   const plan = assert(data, 'plan');
 
-  return catchErrors(createSubscription(uid, plan, data.coupon));
+  return catchErrors(createSubscription(uid, plan, data.metadata, data.coupon));
 });
 
 export const stripeCancelSubscription = functions.https.onCall(async (data, context) => {
