@@ -1,7 +1,13 @@
 export { stripeCancelSubscription, stripeCreateSubscription, stripeGetSubscriptions } from './subscriptions';
 export { cleanupUser, stripeCreateCustomer } from './authFunctions';
 export { webhook } from './webhook';
-export { stripeCreateIntent, stripeCancelIntent, stripeRefundIntent, stripeSetupIntent } from './intents';
+export {
+  stripeCreateIntent,
+  stripeCancelIntent,
+  stripeRefundIntent,
+  stripeSetupIntent,
+  stripeChargeUser,
+} from './intents';
 export {
   stripeGetPaymentMethods,
   stripeSavePaymentMethod,

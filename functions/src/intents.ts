@@ -110,3 +110,12 @@ export const stripeRefundIntent = functions.https.onCall(async (data, context) =
 
   return catchErrors(refundPayment(intentId, amount));
 });
+
+export const stripeChargeUser = functions.https.onCall(async (data, context) => {
+  assertUID(context);
+  const uid = assert(data, 'uid');
+  const amount = assert(data, 'amount');
+  const metadata = assert(data, 'metadata');
+
+  return catchErrors(chargePayment(uid, amount, metadata));
+});
